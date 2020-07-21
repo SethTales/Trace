@@ -1,4 +1,5 @@
 ﻿using System.Threading.Tasks;
+using Amazon.CognitoIdentityProvider.Model;
 using Trace.Models;
 
 namespace Trace.Adapters.Helpers.Interfaces
@@ -7,5 +8,6 @@ namespace Trace.Adapters.Helpers.Interfaces
     {
         Task<bool> UserExists(AwsCognitoUser user);
         Task<bool> UserIsConfirmed(AwsCognitoUser user);
+        Task<UserType> GetUserInfo(AwsCognitoUser user);
     }
 }

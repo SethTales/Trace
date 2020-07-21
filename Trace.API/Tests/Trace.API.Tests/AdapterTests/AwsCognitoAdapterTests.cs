@@ -10,7 +10,7 @@ using Trace.Adapters.Helpers.Interfaces;
 using Trace.Adapters.Interfaces;
 using Trace.Models;
 
-namespace Trace.API.Tests.UnitTests.AdapterTests
+namespace Trace.API.UnitTests.AdapterTests
 {
     [TestFixture]
     public class AwsCognitoAdapterTests

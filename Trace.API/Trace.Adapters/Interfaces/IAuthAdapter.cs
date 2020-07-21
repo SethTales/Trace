@@ -10,5 +10,6 @@ namespace Trace.Adapters.Interfaces
         Task<HttpResponseMessage> RegisterNewUserAsync(AwsCognitoUser user);
         Task<HttpResponseMessage> ConfirmUserAsync(AwsCognitoUser user);
         Task<HttpResponseMessage> AuthenticateUserAsync(AwsCognitoUser user);
+        Task<HttpResponseMessage> AdminDeleteUser(AwsCognitoUser user);
     }
 }

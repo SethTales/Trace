@@ -1,5 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using System.Net.Http;
 using System.Net;
 using Amazon.CognitoIdentityProvider;
@@ -14,9 +13,10 @@ namespace Trace.Adapters
 {
     public class AwsCognitoAdapter : IAuthAdapter
     {
-        private readonly IAmazonCognitoIdentityProvider _awsCognitoClient;
-        private readonly IAwsCognitoAdapterHelper _cognitoAdapterHelper;
-        private readonly string _clientId;
+        protected readonly IAmazonCognitoIdentityProvider _awsCognitoClient;
+        protected readonly IAwsCognitoAdapterHelper _cognitoAdapterHelper;
+        protected readonly AwsCognitoAdapterConfig _cognitoConfig;
+        protected string _clientId;
 
         public AwsCognitoAdapter(
             IAmazonCognitoIdentityProvider awsCognitoClient,
@@ -24,6 +24,7 @@ namespace Trace.Adapters
             IAwsCognitoAdapterHelper cognitoAdapterHelper)
         {
             _awsCognitoClient = awsCognitoClient;
+            _cognitoConfig = cognitoConfig;
             _clientId = cognitoConfig.ClientId;
             _cognitoAdapterHelper = cognitoAdapterHelper;
         }
@@ -39,7 +40,25 @@ namespace Trace.Adapters
             {
                 Username = user.UserName,
                 Password = user.Password,
-                ClientId = _clientId
+                ClientId = _clientId,
+                UserAttributes = new List<AttributeType>
+                {
+                    new AttributeType
+                    {
+                        Name = "given_name",
+                        Value = user.FirstName
+                    },
+                    new AttributeType
+                    {
+                        Name = "family_name",
+                        Value = user.LastName
+                    },
+                    new AttributeType
+                    {
+                        Name = "phone_number",
+                        Value = user.PhoneNumber
+                    }
+                }
             };
             var signUpResponse = await _awsCognitoClient.SignUpAsync(signUpRequest);
 
@@ -97,6 +116,23 @@ namespace Trace.Adapters
                 StatusCode = HttpStatusCode.OK,
                 Content = new StringContent(JsonConvert.SerializeObject(authResponse.AuthenticationResult))
             };
+        }
+
+        public async Task<HttpResponseMessage> AdminDeleteUser(AwsCognitoUser user)
+        {
+            if (!await _cognitoAdapterHelper.UserExists(user))
+            {
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            }
+
+            var userInfo = await _cognitoAdapterHelper.GetUserInfo(user);
+            await _awsCognitoClient.AdminDeleteUserAsync(new AdminDeleteUserRequest
+            {
+                UserPoolId = _cognitoConfig.UserPoolId,
+                Username = userInfo.Username
+            });
+
+            return new HttpResponseMessage(HttpStatusCode.OK);
         }
     }
 }

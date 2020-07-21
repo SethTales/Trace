@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System;
+using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 using System.Net.Http;
 using System.Net;
@@ -23,27 +24,36 @@ namespace Trace.API.Controllers
         [Route("create")]
         public async Task<IActionResult> CreateAccount([FromBody] AwsCognitoUser cognitoUser)
         {
-            var signUpResponse = await _authAdapter.RegisterNewUserAsync(cognitoUser);
-
-            switch (signUpResponse.StatusCode)
+            try
             {
-                case HttpStatusCode.Conflict:
-                    return new ConflictObjectResult($"The email address {cognitoUser.UserName} already has an account associated with it.");
-                case HttpStatusCode.Created:
-                    return new OkObjectResult($"Account successfully created. Please check your email for a confirmation code.");
-                default:
-                    return new ContentResult
-                    {
-                        ContentType = "text/plain",
-                        Content = "An error has occurred",
-                        StatusCode = (int) signUpResponse.StatusCode
-                    };
+                var signUpResponse = await _authAdapter.RegisterNewUserAsync(cognitoUser);
+                switch (signUpResponse.StatusCode)
+                {
+                    case HttpStatusCode.Conflict:
+                        return new ConflictObjectResult($"The email address {cognitoUser.UserName} already has an account associated with it.");
+                    case HttpStatusCode.Created:
+                        return new OkObjectResult($"Account successfully created. Please check your email for a confirmation code.");
+                    default:
+                        return new ContentResult
+                        {
+                            ContentType = "text/plain",
+                            Content = "An error has occurred",
+                            StatusCode = (int)signUpResponse.StatusCode
+                        };
+                }
             }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw;
+            }
+
+            
         }
 
         [HttpPost]
         [Route("user/status")]
-        public async Task<IActionResult> ConfirmAccount(AwsCognitoUser cognitoUser, string message = "")
+        public async Task<IActionResult> ConfirmAccount([FromBody] AwsCognitoUser cognitoUser)
         {
             HttpResponseMessage confirmSignUpResponse;
 
@@ -90,37 +100,48 @@ namespace Trace.API.Controllers
 
         [HttpPost]
         [Route("users/authenticate")]
-        public async Task<IActionResult> Login(AwsCognitoUser cognitoUser, string message = "")
+        public async Task<IActionResult> Login([FromBody] AwsCognitoUser cognitoUser)
         {
-            var loginResponse = await _authAdapter.AuthenticateUserAsync(cognitoUser);
-
-            switch (loginResponse.StatusCode)
+            try
             {
-                case HttpStatusCode.OK:
-                    var authResult = JsonConvert.DeserializeObject<AuthenticationResultType>(await loginResponse.Content.ReadAsStringAsync());
-                    var tokenResponse = new TokenResponse
-                    {
-                        IdToken = authResult.IdToken,
-                        RefreshToken = authResult.RefreshToken,
-                        AccessToken = authResult.AccessToken
-                    };
-                    return new ContentResult
-                    {
-                        Content = JsonConvert.SerializeObject(tokenResponse),
-                        ContentType = "application/json",
-                        StatusCode = (int)HttpStatusCode.OK
-                    };
-                case HttpStatusCode.BadRequest:
-                    return new BadRequestObjectResult($"Login failed. User {cognitoUser.UserName} is unconfirmed.");
-                case HttpStatusCode.NotFound:
-                    return new NotFoundObjectResult($"Login failed. User {cognitoUser.UserName} does not exist.");
-                default:
-                    return new ContentResult
-                    {
-                        ContentType = "text/plain",
-                        Content = "An error has occurred",
-                        StatusCode = (int) loginResponse.StatusCode
-                    };
+                var loginResponse = await _authAdapter.AuthenticateUserAsync(cognitoUser);
+
+                switch (loginResponse.StatusCode)
+                {
+                    case HttpStatusCode.OK:
+                        var authResult =
+                            JsonConvert.DeserializeObject<AuthenticationResultType>(
+                                await loginResponse.Content.ReadAsStringAsync());
+                        var tokenResponse = new TokenResponse
+                        {
+                            IdToken = authResult.IdToken,
+                            RefreshToken = authResult.RefreshToken,
+                            AccessToken = authResult.AccessToken
+                        };
+                        return new ContentResult
+                        {
+                            Content = JsonConvert.SerializeObject(tokenResponse),
+                            ContentType = "application/json",
+                            StatusCode = (int) HttpStatusCode.OK
+                        };
+                    case HttpStatusCode.BadRequest:
+                        return new BadRequestObjectResult($"Login failed. User {cognitoUser.UserName} is unconfirmed.");
+                    case HttpStatusCode.NotFound:
+                        return new NotFoundObjectResult($"Login failed. User {cognitoUser.UserName} does not exist.");
+                    default:
+                        return new ContentResult
+                        {
+                            ContentType = "text/plain",
+                            Content = "An error has occurred",
+                            StatusCode = (int) loginResponse.StatusCode
+                        };
+
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw;
             }
         }
     }

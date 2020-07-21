@@ -6,6 +6,8 @@ using System.Net;
 using System.Threading.Tasks;
 using Amazon;
 using Amazon.CognitoIdentityProvider;
+using Amazon.SecretsManager;
+using Amazon.SecretsManager.Model;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -38,19 +40,23 @@ namespace Trace.API
 
             var builder = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile($"appsettings.json")
+                .AddJsonFile($"appsettings.{_environment}.json")
                 .AddEnvironmentVariables();
 
             Configuration = builder.Build();
         }
 
         // This method gets called by the runtime. Use this method to add services to the container.
-        public void ConfigureServices(IServiceCollection services)
+        public virtual void ConfigureServices(IServiceCollection services)
         {
-            var deployBucket = Configuration.GetSection("AWS").GetSection("S3")["DeployBucket"];
-            var cognitoConfigKey = Configuration.GetSection("AWS").GetSection("S3")["CognitoConfigurationKey"];
+            var cognitoConfigKey = Configuration.GetSection("AWS").GetSection("Secrets")["CognitoConfig"];
 
-            var cognitoAdapterConfig = JsonConvert.DeserializeObject<AwsCognitoAdapterConfig>(storageAdapter.GetObjectAsync(deployBucket, cognitoConfigKey).Result);
+            var secretsClient = new AmazonSecretsManagerClient(RegionEndpoint.USWest2);
+            var cognitoConfigSecretResponse = secretsClient.GetSecretValueAsync(new GetSecretValueRequest
+            {
+                SecretId = cognitoConfigKey
+            }).Result;
+            var cognitoAdapterConfig = JsonConvert.DeserializeObject<AwsCognitoAdapterConfig>(cognitoConfigSecretResponse.SecretString);
             var validIssuer = Configuration.GetValidIssuer(cognitoAdapterConfig.UserPoolId);
 
             services.Configure<CookiePolicyOptions>(options =>
@@ -59,7 +65,10 @@ namespace Trace.API
                 //options.CheckConsentNeeded = context => true;
                 options.MinimumSameSitePolicy = SameSiteMode.None;
             });
-            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
+            services
+                .AddMvc().AddApplicationPart(typeof(Startup).Assembly) //need this to make the integrations tests work: https://stackoverflow.com/a/58079778
+                .SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
+                
 
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 .AddJwtBearer(options =>

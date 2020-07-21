@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netcoreapp2.1</TargetFramework>
@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Trace.Adapters\Trace.Adapters.csproj" />
+    <ProjectReference Include="..\..\Trace.API\Trace.API.csproj" />
     <ProjectReference Include="..\..\Trace.Models\Trace.Models.csproj" />
   </ItemGroup>
 

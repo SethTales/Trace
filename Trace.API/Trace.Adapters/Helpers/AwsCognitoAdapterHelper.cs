@@ -30,6 +30,11 @@ namespace Trace.Adapters.Helpers
             return cognitoUser.UserStatus == UserStatusType.CONFIRMED;
         }
 
+        public Task<UserType> GetUserInfo(AwsCognitoUser user)
+        {
+            return LookupUserByEmailAsync(_userPoolId, user.UserName);
+        }
+
         private async Task<UserType> LookupUserByEmailAsync(string userPoolId, string userName)
         {
             var listUsersRequest = new ListUsersRequest()
