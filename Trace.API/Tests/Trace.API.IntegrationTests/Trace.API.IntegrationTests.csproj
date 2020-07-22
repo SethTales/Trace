@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Trace.API.Client\Trace.API.Client.csproj" />
     <ProjectReference Include="..\..\Trace.API\Trace.API.csproj" />
     <ProjectReference Include="..\..\Trace.Models\Trace.Models.csproj" />
   </ItemGroup>
