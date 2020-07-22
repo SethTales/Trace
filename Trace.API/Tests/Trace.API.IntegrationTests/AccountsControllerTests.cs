@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -9,7 +8,6 @@ using System.Threading.Tasks;
 using Amazon;
 using Amazon.SecretsManager;
 using Amazon.SecretsManager.Model;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using NUnit.Framework;
@@ -27,6 +25,8 @@ namespace Trace.API.IntegrationTests
         private const string CreateAccountEndpoint = "accounts/create";
         private const string ConfirmAccountEndpoint = "accounts/user/status";
         private const string LoginEndpoint = "accounts/users/authenticate";
+        private const string ResetPasswordEndpoint = "accounts/user/password/reset";
+        private const string ConfirmPasswordEndpoint = "accounts/user/password/confirm";
         private const string TestUserSecretId = "dev/trace/test-user-creds";
 
         private AwsCognitoUser _user;
@@ -35,6 +35,7 @@ namespace Trace.API.IntegrationTests
         private TestUserCreds _testUserCreds;
         private IAuthAdapter _authAdapter;
         private HttpClient _httpClient;
+        private string _token;
 
         [OneTimeSetUp]
         public void OneTimeSetUp()
@@ -67,50 +68,88 @@ namespace Trace.API.IntegrationTests
         }
 
         [Test]
-        public async Task UserCanSignUp_AndRetrieve_JWT_Token()
+        public async Task UserCanSignUp_ConfirmAccount_AndLogin()
         {
-            var createRequest = new HttpRequestMessage
-            {
-                Content = new StringContent(JsonConvert.SerializeObject(_user)),
-                Method = HttpMethod.Post,
-                RequestUri = new Uri($"{BaseAddress}/{CreateAccountEndpoint}")
-            };
-            createRequest.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-            var createResponse = await _httpClient.SendAsync(createRequest);
-
+            var createResponse = await CreateAccount();
             Assert.IsTrue(createResponse.IsSuccessStatusCode);
 
+            var confirmResponse = await ConfirmAccount();
+            Assert.IsTrue(confirmResponse.IsSuccessStatusCode);
+
+            var loginResponse = await Login();
+            Assert.IsTrue(loginResponse.IsSuccessStatusCode);
+        }
+
+        [Test]
+        public async Task UserCanResetPassword()
+        {
+            await CreateAccount();
+            await ConfirmAccount();
+            var loginResponse = await Login();
+            var tokenResponse = JsonConvert.DeserializeObject<TokenResponse>(await loginResponse.Content.ReadAsStringAsync());
+            _token = tokenResponse.IdToken;
+
+            var resetPasswordResponse = await ResetPassword();
+            Assert.IsTrue(resetPasswordResponse.IsSuccessStatusCode);
+
+            _user.Password = "abcdABCD1234&";
+            var confirmPasswordRespsone = await ConfirmNewPassword();
+            Assert.IsTrue(confirmPasswordRespsone.IsSuccessStatusCode);
+        }
+
+        private async Task<HttpResponseMessage> CreateAccount()
+        {
+            return await SendHttpRequestWithBody(_user, HttpMethod.Post, CreateAccountEndpoint);
+        }
+
+        private async Task<HttpResponseMessage> ConfirmAccount()
+        {
+            _user.ConfirmationCode = GetVerificationCodeFromEmail();
+            return await SendHttpRequestWithBody(_user, HttpMethod.Post, ConfirmAccountEndpoint);
+        }
+
+        private async Task<HttpResponseMessage> Login()
+        {
+            return await SendHttpRequestWithBody(_user, HttpMethod.Post, LoginEndpoint);
+        }
+
+        private async Task<HttpResponseMessage> ResetPassword()
+        {
+            return await SendHttpRequestWithBody(_user, HttpMethod.Post, ResetPasswordEndpoint, _token);
+        }
+
+        private async Task<HttpResponseMessage> ConfirmNewPassword()
+        {
+            _user.ConfirmationCode = GetVerificationCodeFromEmail();
+            return await SendHttpRequestWithBody(_user, HttpMethod.Post, ConfirmPasswordEndpoint, _token);
+        }
+
+        private async Task<HttpResponseMessage> SendHttpRequestWithBody(object content, HttpMethod method, string endpoint, string token = null)
+        {
+            var request = new HttpRequestMessage
+            {
+                Content = new StringContent(JsonConvert.SerializeObject(content)),
+                Method = method,
+                RequestUri = new Uri($"{BaseAddress}/{endpoint}")
+            };
+            request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+            if (token != null)
+            {
+                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+            }
+            return await _httpClient.SendAsync(request);
+        }
+
+        private string GetVerificationCodeFromEmail()
+        {
             Thread.Sleep(2500); // wait a little while to ensure email delivery
+
             var authenticationEmail = _emailAdapter.GetLatestMessage("pop.gmail.com", true, 995,
                 _testUserCreds.TraceTestUserEmail, _testUserCreds.TraceTestUserPassword);
             var messageHtml = authenticationEmail.FindFirstHtmlVersion();
             var emailContent = Encoding.UTF8.GetString(messageHtml.Body);
             var confirmationCode = GetConfirmationCodeFromEmailBody(emailContent);
-            _user.ConfirmationCode = confirmationCode;
-
-            var confirmRequest = new HttpRequestMessage
-            {
-                Content = new StringContent(JsonConvert.SerializeObject(_user)),
-                Method = HttpMethod.Post,
-                RequestUri = new Uri($"{BaseAddress}/{ConfirmAccountEndpoint}")
-            };
-            confirmRequest.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-            var confirmResponse = await _httpClient.SendAsync(confirmRequest);
-
-            Assert.IsTrue(confirmResponse.IsSuccessStatusCode);
-
-            var loginRequest = new HttpRequestMessage
-            {
-                Content = new StringContent(JsonConvert.SerializeObject(_user)),
-                Method = HttpMethod.Post,
-                RequestUri = new Uri($"{BaseAddress}/{LoginEndpoint}")
-            };
-            loginRequest.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-            var loginResponse = await _httpClient.SendAsync(loginRequest);
-            //TODO: verify token is legit
-            var loginResponseBody = await loginResponse.Content.ReadAsStringAsync();
-
-            Assert.IsTrue(loginResponse.IsSuccessStatusCode);
+            return confirmationCode;
         }
 
         private async Task CleanUpTestData()
@@ -120,7 +159,7 @@ namespace Trace.API.IntegrationTests
                 _testUserCreds.TraceTestUserEmail, _testUserCreds.TraceTestUserPassword);
         }
 
-        private string GetConfirmationCodeFromEmailBody(string emailBody)
+        private static string GetConfirmationCodeFromEmailBody(string emailBody)
         {
             var re = new Regex(@"([0-9]){6}");
             return re.Match(emailBody).Value;

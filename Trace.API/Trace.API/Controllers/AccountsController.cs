@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using System.Net.Http;
 using System.Net;
 using Amazon.CognitoIdentityProvider.Model;
+using Microsoft.AspNetCore.Authorization;
 using Newtonsoft.Json;
 using Trace.Adapters.Interfaces;
 using Trace.Models;
@@ -142,6 +143,58 @@ namespace Trace.API.Controllers
             {
                 Console.WriteLine(e);
                 throw;
+            }
+        }
+
+        [HttpPost]
+        [Authorize]
+        [Route("user/password/reset")]
+        public async Task<IActionResult> ForgotPassword([FromBody] AwsCognitoUser cognitoUser)
+        {
+            var forgotPasswordResponse = await _authAdapter.ResetPasswordAsync(cognitoUser);
+
+            switch (forgotPasswordResponse.StatusCode)
+            {
+                case HttpStatusCode.OK:
+                    return new OkObjectResult("Password reset code sent.");
+                case HttpStatusCode.BadRequest:
+                    return new BadRequestObjectResult($"Password reset failed. User {cognitoUser.UserName} is unconfirmed.");
+                case HttpStatusCode.NotFound:
+                    return new NotFoundObjectResult($"Password reset failed. User {cognitoUser.UserName} does not exist.");
+                default:
+                    return new ContentResult
+                    {
+                        ContentType = "text/plain",
+                        Content = "An error has occurred",
+                        StatusCode = (int)forgotPasswordResponse.StatusCode
+                    };
+
+            }
+        }
+
+        [HttpPost]
+        [Authorize]
+        [Route("user/password/confirm")]
+        public async Task<IActionResult> ConfirmNewPassword([FromBody] AwsCognitoUser cognitoUser)
+        {
+            var confirmPasswordResponse = await _authAdapter.ConfirmNewPasswordAsync(cognitoUser);
+
+            switch (confirmPasswordResponse.StatusCode)
+            {
+                case HttpStatusCode.OK:
+                    return new OkObjectResult("New password confirmed.");
+                case HttpStatusCode.BadRequest:
+                    return new BadRequestObjectResult($"Password confirmation failed. User {cognitoUser.UserName} is unconfirmed.");
+                case HttpStatusCode.NotFound:
+                    return new NotFoundObjectResult($"Password confirmation failed. User {cognitoUser.UserName} does not exist.");
+                default:
+                    return new ContentResult
+                    {
+                        ContentType = "text/plain",
+                        Content = "An error has occurred",
+                        StatusCode = (int)confirmPasswordResponse.StatusCode
+                    };
+
             }
         }
     }
