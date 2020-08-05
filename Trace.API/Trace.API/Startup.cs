@@ -118,6 +118,7 @@ namespace Trace.API
             }
 
             app.UseHttpsRedirection();
+            app.UseAuthentication();
             app.UseMvc();
         }
     }

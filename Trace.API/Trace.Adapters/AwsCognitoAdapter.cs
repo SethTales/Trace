@@ -118,6 +118,52 @@ namespace Trace.Adapters
             };
         }
 
+        public async Task<HttpResponseMessage> ResetPasswordAsync(AwsCognitoUser user)
+        {
+            if (!await _cognitoAdapterHelper.UserExists(user))
+            {
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            }
+
+            if (!await _cognitoAdapterHelper.UserIsConfirmed(user))
+            {
+                return new HttpResponseMessage(HttpStatusCode.BadRequest);
+            }
+
+            var userInfo = await _cognitoAdapterHelper.GetUserInfo(user);
+            await _awsCognitoClient.ForgotPasswordAsync(new ForgotPasswordRequest
+            {
+                Username = userInfo.Username,
+                ClientId = _cognitoConfig.ClientId
+            });
+
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        }
+
+        public async Task<HttpResponseMessage> ConfirmNewPasswordAsync(AwsCognitoUser user)
+        {
+            if (!await _cognitoAdapterHelper.UserExists(user))
+            {
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            }
+
+            if (!await _cognitoAdapterHelper.UserIsConfirmed(user))
+            {
+                return new HttpResponseMessage(HttpStatusCode.BadRequest);
+            }
+
+            var userInfo = await _cognitoAdapterHelper.GetUserInfo(user);
+            await _awsCognitoClient.ConfirmForgotPasswordAsync(new ConfirmForgotPasswordRequest
+            {
+                Username = userInfo.Username,
+                ClientId = _cognitoConfig.ClientId,
+                ConfirmationCode = user.ConfirmationCode,
+                Password = user.Password
+            });
+
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        }
+
         public async Task<HttpResponseMessage> AdminDeleteUser(AwsCognitoUser user)
         {
             if (!await _cognitoAdapterHelper.UserExists(user))
