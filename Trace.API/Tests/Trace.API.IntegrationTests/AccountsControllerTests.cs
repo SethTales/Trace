@@ -1,6 +1,4 @@
-﻿using System;
-using System.Net.Http;
-using System.Net.Http.Headers;
+﻿using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -24,12 +22,6 @@ namespace Trace.API.IntegrationTests
 {
     public class AccountsControllerIntegrationTests
     {
-        private const string BaseAddress = "http://localhost";
-        private const string CreateAccountEndpoint = "accounts/create";
-        private const string ConfirmAccountEndpoint = "accounts/user/status";
-        private const string LoginEndpoint = "accounts/users/authenticate";
-        private const string ResetPasswordEndpoint = "accounts/user/password/reset";
-        private const string ConfirmPasswordEndpoint = "accounts/user/password/confirm";
         private const string TestUserSecretId = "dev/trace/test-user-creds";
 
         private AwsCognitoUser _user;
@@ -38,7 +30,6 @@ namespace Trace.API.IntegrationTests
         private TestUserCreds _testUserCreds;
         private IAuthAdapter _authAdapter;
         private HttpClient _httpClient;
-        private string _token;
 
         private ClientConfig _clientConfig = new ClientConfig
         {
@@ -51,8 +42,7 @@ namespace Trace.API.IntegrationTests
         public void OneTimeSetUp()
         {
             _testServer = new TestServer();
-            _httpClient = new HttpClient();
-            //_httpClient = _testServer.CreateClient();
+            _httpClient = _testServer.CreateClient();
             var secretsClient = new AmazonSecretsManagerClient(RegionEndpoint.USWest2);
             var secretResponse = secretsClient.GetSecretValueAsync(new GetSecretValueRequest
             {
@@ -83,11 +73,11 @@ namespace Trace.API.IntegrationTests
         [Test]
         public async Task UserCanSignUp_ConfirmAccount_AndLogin()
         {
-            var createResponse = await _apiClient.CreatAccountWithRetryAsync(_user);
+            var createResponse = await _apiClient.CreateAccountWithRetryAsync(_user);
             Assert.IsTrue(createResponse.IsSuccessStatusCode);
 
             _user.ConfirmationCode = GetVerificationCodeFromEmail();
-            var confirmResponse = await _apiClient.ConfirmAccountWithReryAsync(_user);
+            var confirmResponse = await _apiClient.ConfirmAccountWithRetryAsync(_user);
             Assert.IsTrue(confirmResponse.IsSuccessStatusCode);
 
             var loginResponse = await _apiClient.LoginWithRetryAsync(_user);
@@ -97,9 +87,9 @@ namespace Trace.API.IntegrationTests
         [Test]
         public async Task UserCanResetPassword()
         {
-            await _apiClient.CreatAccountWithRetryAsync(_user);
+            await _apiClient.CreateAccountWithRetryAsync(_user);
             _user.ConfirmationCode = GetVerificationCodeFromEmail();
-            await _apiClient.ConfirmAccountWithReryAsync(_user);
+            await _apiClient.ConfirmAccountWithRetryAsync(_user);
             await _apiClient.LoginWithRetryAsync(_user);
 
             var resetPasswordResponse = await _apiClient.ResetPasswordWithRetryAsync(_user);
@@ -107,7 +97,7 @@ namespace Trace.API.IntegrationTests
 
             _user.ConfirmationCode = GetVerificationCodeFromEmail();
             _user.Password = "abcdABCD1234&";
-            var confirmPasswordRespsone = await _apiClient.ConfirmAccountWithReryAsync(_user);
+            var confirmPasswordRespsone = await _apiClient.ConfirmPasswordWithRetryAsync(_user);
             Assert.IsTrue(confirmPasswordRespsone.IsSuccessStatusCode);
         }
 

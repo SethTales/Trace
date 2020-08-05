@@ -32,7 +32,7 @@ namespace Trace.API.Client
             _httpHandler = httpHandler;
         }
 
-        public async Task<HttpResponseMessage> CreatAccountWithRetryAsync(AwsCognitoUser user)
+        public async Task<HttpResponseMessage> CreateAccountWithRetryAsync(AwsCognitoUser user)
         {
             return await Policy.HandleResult(_circuitBreaker)
                 .WaitAndRetryAsync(DecorrelatedJitter())
@@ -41,7 +41,7 @@ namespace Trace.API.Client
 
         }
 
-        public async Task<HttpResponseMessage> ConfirmAccountWithReryAsync(AwsCognitoUser user)
+        public async Task<HttpResponseMessage> ConfirmAccountWithRetryAsync(AwsCognitoUser user)
         {
             return await Policy.HandleResult(_circuitBreaker)
                 .WaitAndRetryAsync(DecorrelatedJitter())
