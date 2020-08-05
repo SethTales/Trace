@@ -1,6 +1,4 @@
-﻿using System;
-using System.Net.Http;
-using System.Net.Http.Headers;
+﻿using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -12,6 +10,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using NUnit.Framework;
 using Trace.Adapters.Interfaces;
+using Trace.API.Client;
+using Trace.API.Client.Config;
+using Trace.API.Client.Handlers;
 using Trace.API.IntegrationTests.Adapters;
 using Trace.API.IntegrationTests.Adapters.Interfaces;
 using Trace.API.IntegrationTests.Models;
@@ -21,12 +22,6 @@ namespace Trace.API.IntegrationTests
 {
     public class AccountsControllerIntegrationTests
     {
-        private const string BaseAddress = "http://localhost";
-        private const string CreateAccountEndpoint = "accounts/create";
-        private const string ConfirmAccountEndpoint = "accounts/user/status";
-        private const string LoginEndpoint = "accounts/users/authenticate";
-        private const string ResetPasswordEndpoint = "accounts/user/password/reset";
-        private const string ConfirmPasswordEndpoint = "accounts/user/password/confirm";
         private const string TestUserSecretId = "dev/trace/test-user-creds";
 
         private AwsCognitoUser _user;
@@ -35,7 +30,13 @@ namespace Trace.API.IntegrationTests
         private TestUserCreds _testUserCreds;
         private IAuthAdapter _authAdapter;
         private HttpClient _httpClient;
-        private string _token;
+
+        private ClientConfig _clientConfig = new ClientConfig
+        {
+            BaseUri = "http://localhost"
+        };
+        private IHttpHandler _httpHandler;
+        private ITraceApiClient _apiClient;
 
         [OneTimeSetUp]
         public void OneTimeSetUp()
@@ -59,6 +60,8 @@ namespace Trace.API.IntegrationTests
             };
             var serviceProvider = _testServer.GetTestServiceProvider();
             _authAdapter = serviceProvider.GetRequiredService<IAuthAdapter>();
+            _httpHandler = new HttpHandler(_clientConfig, _httpClient);
+            _apiClient = new TraceApiClient(_httpHandler);
         }
 
         [TearDown]
@@ -70,74 +73,32 @@ namespace Trace.API.IntegrationTests
         [Test]
         public async Task UserCanSignUp_ConfirmAccount_AndLogin()
         {
-            var createResponse = await CreateAccount();
+            var createResponse = await _apiClient.CreateAccountWithRetryAsync(_user);
             Assert.IsTrue(createResponse.IsSuccessStatusCode);
 
-            var confirmResponse = await ConfirmAccount();
+            _user.ConfirmationCode = GetVerificationCodeFromEmail();
+            var confirmResponse = await _apiClient.ConfirmAccountWithRetryAsync(_user);
             Assert.IsTrue(confirmResponse.IsSuccessStatusCode);
 
-            var loginResponse = await Login();
+            var loginResponse = await _apiClient.LoginWithRetryAsync(_user);
             Assert.IsTrue(loginResponse.IsSuccessStatusCode);
         }
 
         [Test]
         public async Task UserCanResetPassword()
         {
-            await CreateAccount();
-            await ConfirmAccount();
-            var loginResponse = await Login();
-            var tokenResponse = JsonConvert.DeserializeObject<TokenResponse>(await loginResponse.Content.ReadAsStringAsync());
-            _token = tokenResponse.IdToken;
+            await _apiClient.CreateAccountWithRetryAsync(_user);
+            _user.ConfirmationCode = GetVerificationCodeFromEmail();
+            await _apiClient.ConfirmAccountWithRetryAsync(_user);
+            await _apiClient.LoginWithRetryAsync(_user);
 
-            var resetPasswordResponse = await ResetPassword();
+            var resetPasswordResponse = await _apiClient.ResetPasswordWithRetryAsync(_user);
             Assert.IsTrue(resetPasswordResponse.IsSuccessStatusCode);
 
+            _user.ConfirmationCode = GetVerificationCodeFromEmail();
             _user.Password = "abcdABCD1234&";
-            var confirmPasswordRespsone = await ConfirmNewPassword();
+            var confirmPasswordRespsone = await _apiClient.ConfirmPasswordWithRetryAsync(_user);
             Assert.IsTrue(confirmPasswordRespsone.IsSuccessStatusCode);
-        }
-
-        private async Task<HttpResponseMessage> CreateAccount()
-        {
-            return await SendHttpRequestWithBody(_user, HttpMethod.Post, CreateAccountEndpoint);
-        }
-
-        private async Task<HttpResponseMessage> ConfirmAccount()
-        {
-            _user.ConfirmationCode = GetVerificationCodeFromEmail();
-            return await SendHttpRequestWithBody(_user, HttpMethod.Post, ConfirmAccountEndpoint);
-        }
-
-        private async Task<HttpResponseMessage> Login()
-        {
-            return await SendHttpRequestWithBody(_user, HttpMethod.Post, LoginEndpoint);
-        }
-
-        private async Task<HttpResponseMessage> ResetPassword()
-        {
-            return await SendHttpRequestWithBody(_user, HttpMethod.Post, ResetPasswordEndpoint, _token);
-        }
-
-        private async Task<HttpResponseMessage> ConfirmNewPassword()
-        {
-            _user.ConfirmationCode = GetVerificationCodeFromEmail();
-            return await SendHttpRequestWithBody(_user, HttpMethod.Post, ConfirmPasswordEndpoint, _token);
-        }
-
-        private async Task<HttpResponseMessage> SendHttpRequestWithBody(object content, HttpMethod method, string endpoint, string token = null)
-        {
-            var request = new HttpRequestMessage
-            {
-                Content = new StringContent(JsonConvert.SerializeObject(content)),
-                Method = method,
-                RequestUri = new Uri($"{BaseAddress}/{endpoint}")
-            };
-            request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-            if (token != null)
-            {
-                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _token);
-            }
-            return await _httpClient.SendAsync(request);
         }
 
         private string GetVerificationCodeFromEmail()

@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Trace.API.UnitTests", "Test
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Trace.API.IntegrationTests", "Tests\Trace.API.IntegrationTests\Trace.API.IntegrationTests.csproj", "{BB145769-1CFA-497E-88A2-E94AD0D128B2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Trace.API.Client", "Trace.API.Client\Trace.API.Client.csproj", "{7C23333F-3F93-45D5-8AB8-1529AC16CA95}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -39,6 +41,10 @@ Global
 		{BB145769-1CFA-497E-88A2-E94AD0D128B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BB145769-1CFA-497E-88A2-E94AD0D128B2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BB145769-1CFA-497E-88A2-E94AD0D128B2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7C23333F-3F93-45D5-8AB8-1529AC16CA95}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7C23333F-3F93-45D5-8AB8-1529AC16CA95}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7C23333F-3F93-45D5-8AB8-1529AC16CA95}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7C23333F-3F93-45D5-8AB8-1529AC16CA95}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
